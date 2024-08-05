@@ -3,9 +3,10 @@
 
 use test_app as _; // global logger + panicking-behavior + memory layout
 
-#[rtic::app(device = stm32h7xx_hal::pac, dispatchers = [FDCAN1_IT0])]
+#[rtic::app(device = stm32h7xx_hal::pac, peripherals = true, dispatchers = [FDCAN1_IT0])]
 mod app {
     use rtic_monotonics::systick::prelude::*;
+    use stm32h7xx_hal::prelude::*;
 
     // Shared resources go here
     #[shared]
@@ -25,7 +26,14 @@ mod app {
     fn init(cx: init::Context) -> (Shared, Local) {
         defmt::info!("init");
 
-        Mono::start(cx.core.SYST, 36_000_000);
+        let _ = {
+            let pwr = cx.device.PWR.constrain();
+            let rcc = cx.device.RCC.constrain();
+
+            rcc.sys_ck(200.MHz(/* 200_000_000 Hz */)).freeze(pwr.freeze(), &cx.device.SYSCFG)
+        };
+
+        Mono::start(cx.core.SYST, 200_000_000);
 
         task1::spawn().ok();
 
@@ -52,6 +60,10 @@ mod app {
     // TODO: Add tasks
     #[task(priority = 1)]
     async fn task1(_cx: task1::Context) {
-        defmt::info!("Hello from task1!");
+        loop {
+            defmt::info!("Hello from task1!");
+
+            Mono::delay(1000.millis()).await;
+        }
     }
 }
