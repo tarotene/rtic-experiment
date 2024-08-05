@@ -1,18 +1,12 @@
 #![no_main]
 #![no_std]
-#![feature(type_alias_impl_trait)]
 
 use test_app as _; // global logger + panicking-behavior + memory layout
 
-// TODO(7) Configure the `rtic::app` macro
-#[rtic::app(
-    // TODO: Replace `some_hal::pac` with the path to the PAC
-    device = some_hal::pac,
-    // TODO: Replace the `FreeInterrupt1, ...` with free interrupt vectors if software tasks are used
-    // You can usually find the names of the interrupt vectors in the some_hal::pac::interrupt enum.
-    dispatchers = [FreeInterrupt1, ...]
-)]
+#[rtic::app(device = stm32h7xx_hal::pac, dispatchers = [FDCAN1_IT0])]
 mod app {
+    use rtic_monotonics::systick::prelude::*;
+
     // Shared resources go here
     #[shared]
     struct Shared {
@@ -25,15 +19,13 @@ mod app {
         // TODO: Add resources
     }
 
+    systick_monotonic!(Mono, 1000);
+
     #[init]
     fn init(cx: init::Context) -> (Shared, Local) {
         defmt::info!("init");
 
-        // TODO setup monotonic if used
-        // let sysclk = { /* clock setup + returning sysclk as an u32 */ };
-        // let token = rtic_monotonics::create_systick_token!();
-        // rtic_monotonics::systick::Systick::new(cx.core.SYST, sysclk, token);
-
+        Mono::start(cx.core.SYST, 36_000_000);
 
         task1::spawn().ok();
 
